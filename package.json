@@ -41,10 +41,13 @@
     "lint": "eslint .",
     "release": "bumpp && npm publish",
     "start": "esno src/index.ts",
-    "test": "vitest",
+    "test": "esno test/test.ts",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "nr build",
     "prepare": "simple-git-hooks"
+  },
+  "dependencies": {
+    "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^3.14.0",
