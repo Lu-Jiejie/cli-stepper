@@ -1,76 +1,134 @@
 import type { StepperOptions, StepperStatus } from './types'
 import process from 'node:process'
 import pc from 'picocolors'
+import Terminal from './terminal'
 
 const defaultOptions: StepperOptions = {
   pendingBadge: 'PENDING',
-  pendingColor: 'yellow',
   successBadge: 'SUCCESS',
+  errorBadge: ' ERROR ',
+
+  pendingColor: 'yellow',
   successColor: 'green',
-  errorBadge: 'ERROR',
   errorColor: 'red',
-  pendingFrames: ['-', '\\', '|', '/'],
-  pendingFrameInterval: 500,
+
+  enableSpinner: true,
+  spinnerFrames: ['-', '\\', '|', '/'],
+  spinnerInterval: 500,
+
+  gracefulExit: false,
+  hideCursor: true,
 }
 
-export class Stepper {
+export default class Stepper {
   private options: StepperOptions
-  private curText: string = ''
-  private status: StepperStatus = 'pending'
-  private pendingFrameIndex = 0
-  private pendingFrameTimer: NodeJS.Timeout | null = null
+  private terminal: Terminal = new Terminal()
+  private text: string = ''
+  private status: StepperStatus = 'none'
+  private spinnerFrameIndex = 0
+  private spinnerTimer: NodeJS.Timeout | null = null
+  private spinnerText: string = ''
+  private sigintCallback: (() => void) | null = null
 
   constructor(options: Partial<StepperOptions>) {
     this.options = { ...defaultOptions, ...options }
   }
 
-  private clearLine() {
-    process.stdout.moveCursor(0, -1)
-    process.stdout.clearLine(0)
-    process.stdout.cursorTo(0)
-  }
-
-  private writeLine(status: StepperStatus, text: string) {
+  private render() {
+    const status = this.status as Exclude<StepperStatus, 'none'>
     const color = this.options[`${status}Color`]
     const badge = this.options[`${status}Badge`]
-    process.stdout.write(`${pc.inverse(pc[color](badge))} ${pc[color](text)}\n`)
+
+    this.terminal.moveCursor(0)
+    if (this.status === 'pending') {
+      this.terminal.write(`${pc.inverse(pc[color](badge))} ${pc[color](this.text + this.spinnerText)}`)
+    }
+    else {
+      this.terminal.write(`${pc.inverse(pc[color](badge))} ${pc[color](this.text)}`)
+    }
+    this.terminal.clearRight()
   }
 
-  private toggleCursor(visible: boolean) {
-    process.stdout.write(visible ? '\x1B[?25h' : '\x1B[?25l')
+  private end(isSignal = false) {
+    const { gracefulExit } = this.options
+
+    // unexpected stop
+    if (this.status === 'pending') {
+      this.status = gracefulExit ? 'success' : 'error'
+    }
+    this.render()
+
+    if (this.sigintCallback) {
+      process.off('SIGINT', this.sigintCallback)
+      process.off('SIGTERM', this.sigintCallback)
+      this.sigintCallback = null
+    }
+
+    this.spinnerTimer && clearInterval(this.spinnerTimer)
+
+    this.terminal.toggleCursor(true)
+    this.terminal.restoreCursor()
+    this.terminal.newLine()
+    this.status = 'none'
+
+    // exit program only when signal
+    if (isSignal) {
+      process.exit(gracefulExit ? 0 : 1)
+    }
   }
+
+  // alias for pending
+  public start(text: string) { this.pending(text) }
 
   public pending(text: string) {
-    const { pendingFrameInterval } = this.options
-    this.curText = text
-    this.toggleCursor(false)
+    const { hideCursor, enableSpinner, spinnerInterval, spinnerFrames } = this.options
+    this.text = text
+    this.status = 'pending'
+
+    // sigint callback
+    if (this.sigintCallback === null) {
+      this.sigintCallback = () => this.end(true)
+      process.on('SIGINT', this.sigintCallback)
+      process.on('SIGTERM', this.sigintCallback)
+    }
+
+    // hide cursor
+    hideCursor && this.terminal.toggleCursor(false)
+
+    // save cursor
+    this.terminal.saveCursor()
 
     // pending frame
-    this.pendingFrameTimer && clearInterval(this.pendingFrameTimer)
-    this.pendingFrameIndex = 0
-    const handlePendingFrame = () => {
-      this.writeLine('pending', `${this.curText} ${this.options.pendingFrames[this.pendingFrameIndex]}`)
-      this.pendingFrameIndex = (this.pendingFrameIndex + 1) % this.options.pendingFrames.length
+    if (enableSpinner) {
+      this.spinnerFrameIndex = 0
+      this.spinnerTimer && clearInterval(this.spinnerTimer)
+      this.spinnerTimer = setInterval(() => {
+        this.spinnerFrameIndex = (this.spinnerFrameIndex + 1) % this.options.spinnerFrames.length
+        this.spinnerText = spinnerFrames[this.spinnerFrameIndex]
+        this.render()
+      }, spinnerInterval)
     }
-    this.pendingFrameTimer = setInterval(() => {
-      this.clearLine()
-      handlePendingFrame()
-    }, pendingFrameInterval)
 
-    handlePendingFrame()
+    // render first frame
+    this.spinnerText = spinnerFrames[this.spinnerFrameIndex]
+    this.render()
   }
 
   public success(text?: string) {
-    this.pendingFrameTimer && clearInterval(this.pendingFrameTimer)
-    this.clearLine()
-    this.writeLine('success', text ?? this.curText)
-    // this.toggleCursor(true)
+    if (this.status !== 'pending')
+      return
+
+    this.status = 'success'
+    this.text = text ?? this.text
+    this.end()
   }
 
   public error(text?: string) {
-    this.pendingFrameTimer && clearInterval(this.pendingFrameTimer)
-    this.clearLine()
-    this.writeLine('error', text ?? this.curText)
-    // this.toggleCursor(true)
+    if (this.status !== 'pending')
+      return
+
+    this.status = 'error'
+    this.text = text ?? this.text
+    this.end()
   }
 }
