@@ -81,6 +81,9 @@ export default class Stepper {
   public start(text: string) { this.pending(text) }
 
   public pending(text: string) {
+    if (this.status !== 'none')
+      return
+
     const { hideCursor, enableSpinner, spinnerInterval, spinnerFrames } = this.options
     this.text = text
     this.status = 'pending'

@@ -1,33 +1,39 @@
-// import { Stepper } from '../src/stepper2'
+import Stepper from '../src/stepper'
 
-// async function demo() {
-//   const stepper = new Stepper({
-//     spinnerFrames: ['', '.', '..', '...'],
-//   })
+async function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
 
-//   // 第一个任务
-//   const task1 = stepper.pending('正在安装项目依赖')
-//   await sleep(2000)
-//   task1.success('依赖安装完成！')
+async function test() {
+  const stepper = new Stepper({
+    spinnerFrames: ['🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗', '🌘'],
+    spinnerInterval: 300,
+    pendingBadge: ' 进行中 ',
+    successBadge: ' 完成 ',
+    errorBadge: ' 失败 ',
+  })
 
-//   // 第二个任务（可以与其他任务并行）
-//   const task2 = stepper.pending('正在部署到服务器')
-//   await sleep(3000)
-//   try {
-//     throw new Error('网络连接失败')
-//   }
-//   catch (error) {
-//     task2.error(`部署失败：${(error as Error).message}`)
-//   }
+  // 测试成功场景
+  stepper.start('正在下载文件...')
+  await sleep(3000)
+  stepper.success('文件下载完成！')
 
-//   // 第三个任务
-//   const task3 = stepper.pending('正在配置环境')
-//   await sleep(2000)
-//   task3.success('环境配置完成')
-// }
+  // 暂停一下，以便观察
+  await sleep(1000)
 
-// function sleep(ms: number) {
-//   return new Promise(resolve => setTimeout(resolve, ms))
-// }
+  // 测试失败场景
+  stepper.pending('正在连接服务器...')
+  await sleep(2000)
+  stepper.error('连接服务器失败！')
 
-// demo().catch(console.error)
+  // 暂停一下，以便观察
+  await sleep(1000)
+
+  // 测试长时间运行
+  stepper.start('正在处理数据，请稍候...')
+  await sleep(4000)
+  stepper.success()
+}
+
+// 运行测试
+test().catch(console.error)
