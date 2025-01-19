@@ -38,7 +38,7 @@ stepper.success('Dependencies downloaded')
 stepper.error('Download failed')
 ```
 
-[!IMPORTANT]
+> [!IMPORTANT]
 > Whenever you want to start the next step, you must end the current step by `.success()` or `.error()`.
 
 ### Configuration
