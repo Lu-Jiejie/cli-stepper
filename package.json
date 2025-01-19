@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.0.0",
   "packageManager": "pnpm@9.15.4",
-  "description": "pkg-description",
+  "description": "A simple CLI stepper for command-line or terminal applications.",
   "author": "Lu-Jiejie <lu-jiejie@outlook.com>",
   "license": "MIT",
   "homepage": "https://github.com/Lu-Jiejie/cli-stepper#readme",
